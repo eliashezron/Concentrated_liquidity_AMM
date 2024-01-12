@@ -7,6 +7,8 @@ import "./interfaces/IERC20.sol";
 
 contract Clamm {
     using SafeCast for int256;
+    using Position for mapping(bytes32 => Position.Info);
+    using Position for Position.Info;
     address public immutable token0;
     address public immutable token1;
     uint24 public immutable fee;
@@ -42,9 +44,7 @@ contract Clamm {
 
     function initialize(uint160 sqrtPriceX96) external {
     require(slot0.sqrtPriceX96 == 0, 'AI');
-
     int24 tick = TickMath.getTickAtSqrtRatio(sqrtPriceX96);
-
     slot0 = Slot0({
         sqrtPriceX96: sqrtPriceX96,
         tick: tick,
@@ -59,6 +59,21 @@ contract Clamm {
         int128 liquidityDelta;
     }
 
+    function checkTicks(int24 tickLower, int24 tickUpper) private pure {
+        require(tickLower < tickUpper, 'TLU');
+        require(tickLower >= TickMath.MIN_TICK, 'TLM');
+        require(tickUpper <= TickMath.MAX_TICK, 'TUM');
+    }
+
+    function _updatePosition(address owner, int24 tickLower, int24 tickUpper, int128 liquidityDelta, int24 _tick) private returns (Position.Info storage position) {
+        position = positions.get(owner, tickLower, tickUpper);
+        //TODO : fees
+        uint256 _feeGrowthGlobal0X128 = 0; // SLOAD for gas optimization
+        uint256 _feeGrowthGlobal1X128 = 0; // SLOAD for gas optimization
+        // TODO: fees
+        position.update(liquidityDelta, 0,0);
+    }
+
     function _modifyPosition(ModifyPositionParams memory params)
         private
         returns (
@@ -67,6 +82,17 @@ contract Clamm {
             int256 amount1
         )
     {
+         checkTicks(params.tickLower, params.tickUpper);
+
+        Slot0 memory _slot0 = slot0; // SLOAD for gas optimization
+
+        position = _updatePosition(
+            params.owner,
+            params.tickLower,
+            params.tickUpper,
+            params.liquidityDelta,
+            _slot0.tick
+        );
         return (positions[bytes32(0)], 0, 0);
     }
 
