@@ -7,7 +7,7 @@ contract Clamm {
     address public immutable token1;
     uint24 public immutable fee;
     int24 public immutable tickSpacing;
-    int128 public immutable maxLiquidityPerTick ;
+    uint128 public immutable maxLiquidityPerTick ;
 
     constructor(
         address _token0,
