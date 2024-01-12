@@ -8,6 +8,12 @@ contract Clamm {
     uint24 public immutable fee;
     int24 public immutable tickSpacing;
     uint128 public immutable maxLiquidityPerTick ;
+    struct Slot0 {
+    uint160 sqrtPriceX96;
+    int24 tick;
+    bool unlocked;
+    }   
+    Slot0 public slot0;
 
     constructor(
         address _token0,
@@ -20,7 +26,18 @@ contract Clamm {
         fee = _fee;
         tickSpacing = _tickSpacing;
         maxLiquidityPerTick = Tick.tickSpacingToMaxLiquidityPerTick(_tickSpacing);
+    }
 
+    function initialize(uint160 sqrtPriceX96) external {
+    require(slot0.sqrtPriceX96 == 0, 'AI');
+
+    int24 tick = TickMath.getTickAtSqrtRatio(sqrtPriceX96);
+
+    slot0 = Slot0({
+        sqrtPriceX96: sqrtPriceX96,
+        tick: tick,
+        unlocked: true
+    });
     }
 
 }
