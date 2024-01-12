@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.19;
 import "./lib/Tick.sol";
+import "./lib/Position.sol";
+import "./lib/SafeCast.sol";
+import "./interfaces/IERC20.sol";
 
 contract Clamm {
+    using SafeCast for int256;
     address public immutable token0;
     address public immutable token1;
     uint24 public immutable fee;
@@ -14,6 +18,7 @@ contract Clamm {
     bool unlocked;
     }   
     Slot0 public slot0;
+    mapping(bytes32 => Position.Info) public positions;
 
     constructor(
         address _token0,
@@ -28,6 +33,13 @@ contract Clamm {
         maxLiquidityPerTick = Tick.tickSpacingToMaxLiquidityPerTick(_tickSpacing);
     }
 
+    modifier lock() {
+        require(slot0.unlocked, 'LOcked');
+        slot0.unlocked = false;
+        _;
+        slot0.unlocked = true;
+    }
+
     function initialize(uint160 sqrtPriceX96) external {
     require(slot0.sqrtPriceX96 == 0, 'AI');
 
@@ -38,6 +50,54 @@ contract Clamm {
         tick: tick,
         unlocked: true
     });
+    }
+
+    struct ModifyPositionParams {
+        address owner;
+        int24 tickLower;
+        int24 tickUpper;
+        int128 liquidityDelta;
+    }
+
+    function _modifyPosition(ModifyPositionParams memory params)
+        private
+        returns (
+            Position.Info storage position,
+            int256 amount0,
+            int256 amount1
+        )
+    {
+        return (positions[bytes32(0)], 0, 0);
+    }
+
+    function mint(
+    address recipient,
+    int24 tickLower,
+    int24 tickUpper,
+    uint128 amount,
+    bytes calldata data
+    ) external lock returns (uint256 amount0, uint256 amount1) {
+        require(amount > 0);
+        (, int256 amount0Int, int256 amount1Int) =
+            _modifyPosition(
+                ModifyPositionParams({
+                    owner: recipient,
+                    tickLower: tickLower,
+                    tickUpper: tickUpper,
+                    liquidityDelta: int256(uint256(amount)).toInt128()
+                })
+            );
+        amount0 = uint256(amount0Int);
+        amount1 = uint256(amount1Int);
+
+        if (amount0>0) {
+            IERC20(token0).transferFrom(msg.sender, address(this), amount0);
+        }
+        if (amount1>0) {
+            IERC20(token1).transferFrom(msg.sender, address(this), amount1);
+        }
+
+
     }
 
 }
