@@ -44,14 +44,11 @@ library Position {
         uint256 feeGrowthInside1X128
     ) internal {
         Info memory _self = self;
-
         uint128 liquidityNext;
         if (liquidityDelta == 0) {
             require(_self.liquidity > 0, 'NP'); // disallow pokes for 0 liquidity positions
             liquidityNext = _self.liquidity;
         } 
-    
-
         // update the position
         if (liquidityDelta != 0) {
             self.liquidity = liquidityDelta <0 ? _self.liquidity - uint128  (-liquidityDelta) : _self.liquidity + uint128(liquidityDelta);

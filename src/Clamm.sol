@@ -7,8 +7,10 @@ import "./interfaces/IERC20.sol";
 
 contract Clamm {
     using SafeCast for int256;
+    using Tick for mapping(int24 => Tick.Info);
     using Position for mapping(bytes32 => Position.Info);
     using Position for Position.Info;
+    using Tick for Tick.Info;
     address public immutable token0;
     address public immutable token1;
     uint24 public immutable fee;
@@ -21,6 +23,7 @@ contract Clamm {
     }   
     Slot0 public slot0;
     mapping(bytes32 => Position.Info) public positions;
+    mapping(int24 => Tick.Info) public ticks;
 
     constructor(
         address _token0,
@@ -70,8 +73,39 @@ contract Clamm {
         //TODO : fees
         uint256 _feeGrowthGlobal0X128 = 0; // SLOAD for gas optimization
         uint256 _feeGrowthGlobal1X128 = 0; // SLOAD for gas optimization
-        // TODO: fees
+        bool flippedLower;
+        bool flippedUpper;
+        if (liquidityDelta != 0) {
+                flippedLower = ticks.update(
+                tickLower,
+                _tick,
+                liquidityDelta,
+                _feeGrowthGlobal0X128,
+                _feeGrowthGlobal1X128,
+                false,
+                maxLiquidityPerTick
+            );
+            flippedUpper = ticks.update(
+                tickUpper,
+                _tick,
+                liquidityDelta,
+                _feeGrowthGlobal0X128,
+                _feeGrowthGlobal1X128,
+                true,
+                maxLiquidityPerTick
+            );
+            if (flippedLower) ticks.clear(tickLower);
+            if (flippedUpper) ticks.clear(tickUpper);
+        }
         position.update(liquidityDelta, 0,0);
+         if (liquidityDelta < 0) {
+            if (flippedLower) {
+                ticks.clear(tickLower);
+            }
+            if (flippedUpper) {
+                ticks.clear(tickUpper);
+            }
+        }
     }
 
     function _modifyPosition(ModifyPositionParams memory params)
@@ -122,8 +156,6 @@ contract Clamm {
         if (amount1>0) {
             IERC20(token1).transferFrom(msg.sender, address(this), amount1);
         }
-
-
     }
 
 }
